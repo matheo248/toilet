@@ -13,8 +13,8 @@ local function setupLeaderstats(player)
     leaderstats.Parent = player
 
     local units = Instance.new("IntValue")
-    units.Name = "Units"
-    units.Value = 0
+    units.Name = "Speakerman"
+    units.Value = 1
     units.Parent = leaderstats
 end
 
