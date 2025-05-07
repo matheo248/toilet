@@ -1,0 +1,116 @@
+local Players = game:GetService("Players")
+local ServerScriptService = game:GetService("ServerScriptService")
+
+-- Add UserIDs of players who should be able to use the command.
+-- If empty, anyone can use the command.
+local ADMIN_USER_IDS = {
+    -- Example: 1234567, -- Replace with actual UserIDs of admins
+}
+
+local GIFT_OWNER_COMMAND = "/giftowner"
+
+local function setupOwnerStat(player)
+    local leaderstats = player:FindFirstChild("leaderstats")
+    if not leaderstats then
+        leaderstats = Instance.new("Folder")
+        leaderstats.Name = "leaderstats"
+        leaderstats.Parent = player
+    end
+
+    local isOwner = leaderstats:FindFirstChild("IsOwner")
+    if not isOwner then
+        isOwner = Instance.new("BoolValue")
+        isOwner.Name = "IsOwner"
+        isOwner.Value = false -- Default to not owner
+        isOwner.Parent = leaderstats
+    end
+end
+
+local function canUseCommand(player)
+    if #ADMIN_USER_IDS == 0 then
+        return true -- Anyone can use if admin list is empty
+    end
+    for _, adminId in ADMIN_USER_IDS do
+        if player.UserId == adminId then
+            return true
+        end
+    end
+    return false
+end
+
+local function onPlayerChatted(player, message)
+    local lowerMessage = string.lower(message)
+    local parts = string.split(lowerMessage, " ")
+
+    if parts[1] == GIFT_OWNER_COMMAND then
+        if not canUseCommand(player) then
+            print(player.Name .. " tried to use " .. GIFT_OWNER_COMMAND .. " without permission.")
+            -- Optionally, send a chat message to the player:
+            -- game:GetService("Chat"):Chat(player.Character, "You do not have permission to use this command.", Enum.ChatColor.Red)
+            return
+        end
+
+        if #parts &lt; 2 then
+            print("Usage: " .. GIFT_OWNER_COMMAND .. " [playerName]")
+            -- Optionally, send usage to player:
+            -- game:GetService("Chat"):Chat(player.Character, "Usage: " .. GIFT_OWNER_COMMAND .. " [playerName]", Enum.ChatColor.Yellow)
+            return
+        end
+
+        local targetPlayerName = parts[2]
+        local targetPlayer = nil
+
+        for _, p in Players:GetPlayers() do
+            if string.lower(p.Name) == targetPlayerName then
+                targetPlayer = p
+                break
+            end
+        end
+
+        if targetPlayer then
+            local leaderstats = targetPlayer:FindFirstChild("leaderstats")
+            if leaderstats then
+                local isOwnerStat = leaderstats:FindFirstChild("IsOwner")
+                if isOwnerStat and isOwnerStat:IsA("BoolValue") then
+                    isOwnerStat.Value = true
+                    print(targetPlayer.Name .. " has been granted Owner status by " .. player.Name .. ".")
+                    -- Optionally, notify the granting player and/or the target player via chat
+                else
+                    print("Could not find 'IsOwner' stat for " .. targetPlayer.Name .. ". Make sure leaderstats are set up correctly.")
+                end
+            else
+                print("Could not find leaderstats for " .. targetPlayer.Name .. ". Leaderstats might not have been created yet.")
+            end
+        else
+            print("Player '" .. targetPlayerName .. "' not found.")
+            -- Optionally, notify the granting player:
+            -- game:GetService("Chat"):Chat(player.Character, "Player '" .. targetPlayerName .. "' not found.", Enum.ChatColor.Red)
+        end
+    end
+end
+
+local function onPlayerAdded(player)
+    setupOwnerStat(player)
+    player.Chatted:Connect(function(message)
+        onPlayerChatted(player, message)
+    end)
+end
+
+-- Connect to PlayerAdded for new players
+Players.PlayerAdded:Connect(onPlayerAdded)
+
+-- Handle players already in the game
+for _, player in Players:GetPlayers() do
+    -- It's good practice to run this in a protected call in case a player is leaving
+    -- or their character is in an unexpected state during script startup.
+    local success, err = pcall(function()
+        onPlayerAdded(player)
+    end)
+    if not success then
+        warn("Error setting up owner stat for existing player " .. player.Name .. ": " .. err)
+    end
+end
+
+print("OwnerGiftingScript loaded. Use /giftowner [playerName] to grant owner status.")
+print("If you want to restrict command usage, add UserIDs to the ADMIN_USER_IDS table in the script.")
+
