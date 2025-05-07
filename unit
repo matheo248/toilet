@@ -1,0 +1,108 @@
+local Players = game:GetService("Players")
+local ServerScriptService = game:GetService("ServerScriptService")
+
+local ADMIN_USER_IDS = { -- Add UserIDs of players who should be able to use the command
+    -- Example: 1234567, -- Replace with actual UserIDs
+}
+
+local GIFT_COMMAND = "/giftunits"
+
+local function setupLeaderstats(player)
+    local leaderstats = Instance.new("Folder")
+    leaderstats.Name = "leaderstats"
+    leaderstats.Parent = player
+
+    local units = Instance.new("IntValue")
+    units.Name = "Units"
+    units.Value = 0
+    units.Parent = leaderstats
+end
+
+local function canUseCommand(player)
+    -- For this example, allow anyone if ADMIN_USER_IDS is empty,
+    -- otherwise, only allow admins.
+    if #ADMIN_USER_IDS == 0 then
+        return true
+    end
+    for _, adminId in ADMIN_USER_IDS do
+        if player.UserId == adminId then
+            return true
+        end
+    end
+    return false
+end
+
+local function onPlayerChatted(player, message)
+    local lowerMessage = string.lower(message)
+    local parts = string.split(lowerMessage, " ")
+
+    if parts[1] == GIFT_COMMAND then
+        if not canUseCommand(player) then
+            -- Optionally send a message if they don't have permission
+            -- For example: game:GetService("Chat"):Chat(player.Character, "You do not have permission to use this command.", Enum.ChatColor.Red)
+            print(player.Name .. " tried to use " .. GIFT_COMMAND .. " without permission.")
+            return
+        end
+
+        if #parts &lt; 3 then
+            -- Send usage message to the player who typed the command
+            -- This requires getting the player's character to use Chat service, or just print for server log
+            print("Usage: " .. GIFT_COMMAND .. " [playerName] [amount]")
+            return
+        end
+
+        local targetPlayerName = parts[2]
+        local amount = tonumber(parts[3])
+
+        if not amount or amount &lt;= 0 then
+            print("Invalid amount specified for " .. GIFT_COMMAND)
+            return
+        end
+
+        local targetPlayer = nil
+        for _, p in Players:GetPlayers() do
+            if string.lower(p.Name) == targetPlayerName then
+                targetPlayer = p
+                break
+            end
+        end
+
+        if targetPlayer then
+            local leaderstats = targetPlayer:FindFirstChild("leaderstats")
+            if leaderstats then
+                local unitsStat = leaderstats:FindFirstChild("Units")
+                if unitsStat and unitsStat:IsA("IntValue") then
+                    unitsStat.Value = unitsStat.Value + amount
+                    print("Gave " .. amount .. " units to " .. targetPlayer.Name .. ". They now have " .. unitsStat.Value .. " units.")
+                    -- You could also send a confirmation message to the player who issued the command
+                    -- or to the target player.
+                else
+                    print("Could not find 'Units' stat for " .. targetPlayer.Name)
+                end
+            else
+                print("Could not find leaderstats for " .. targetPlayer.Name)
+            end
+        else
+            print("Player '" .. targetPlayerName .. "' not found.")
+        end
+    end
+end
+
+local function onPlayerAdded(player)
+    setupLeaderstats(player)
+    player.Chatted:Connect(function(message)
+        onPlayerChatted(player, message)
+    end)
+end
+
+-- Connect to PlayerAdded for new players
+Players.PlayerAdded:Connect(onPlayerAdded)
+
+-- Handle players already in the game
+for _, player in Players:GetPlayers() do
+    onPlayerAdded(player)
+end
+
+print("UnitGiftingScript loaded. Use /giftunits [playerName] [amount] to gift units.")
+print("If you want to restrict command usage, add UserIDs to the ADMIN_USER_IDS table in the script.")
+
